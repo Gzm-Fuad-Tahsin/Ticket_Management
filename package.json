@@ -1,0 +1,36 @@
+{
+  "name": "ecom-back-ts",
+  "version": "1.0.0",
+  "main": "src/app.ts",
+  "scripts": {
+    "build": "npx tsc",
+    "start": "node dist/server.js",
+    "dev": "nodemon src/server.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.7.4",
+    "nodemon": "^3.1.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/mongoose": "^5.11.96",
+    "@types/nodemailer": "^6.4.17",
+    "@types/validator": "^13.12.2",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "http-status": "^1.7.4",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.10.0",
+    "validator": "^13.12.0",
+    "zod": "^3.24.2"
+  }
+}
