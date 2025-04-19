@@ -13,4 +13,4 @@ const BusServiceSchema = new Schema<IBusService>({
 
 }, { timestamps: true });
 
-export const Bus = mongoose.model<IBusService>("BusService", BusServiceSchema);
+export const BusService = mongoose.model<IBusService>("BusService", BusServiceSchema);

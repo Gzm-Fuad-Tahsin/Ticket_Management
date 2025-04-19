@@ -2,7 +2,6 @@ import express from "express";
 import {  LoginUserByEmailandPassword, signUpUserByEmailandPassword } from "./auth.controller";
 import { validateRequest } from "../../../middlewares/validateRequest";
 import { AuthValidation } from "./auth.validation";
-import { protect } from "../../../middlewares/auth";
 
 const route = express.Router();
 
