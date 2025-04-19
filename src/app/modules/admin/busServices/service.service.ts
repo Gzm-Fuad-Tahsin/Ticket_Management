@@ -3,7 +3,6 @@ import { IBusService } from "./service.interface";
 import httpStatus from "http-status";
 import AppError from "../../../errors/AppError";
 import { BusService } from "./service.model";
-import { partialUtil } from "zod/lib/helpers/partialUtil";
 
 const createService = async(payload: IBusService)=>{
     const servicesData: Partial<IBusService>= {
