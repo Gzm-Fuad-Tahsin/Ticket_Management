@@ -1,5 +1,8 @@
 import { FilterQuery, Query } from "mongoose";
 
+import { isValidObjectId, Types } from 'mongoose';
+import dayjs from 'dayjs';
+
 class QueryBuilder<T>{
     public modelQuery : Query<T[],T>;
     public query : Record<string, unknown>;
@@ -10,21 +13,53 @@ class QueryBuilder<T>{
     }
 
 
-    search(searchableFields:string[]){
-        const searchTerm = this?.query?.searchTerm
 
-        if(searchTerm){
-           this.modelQuery =  this.modelQuery.find({
-            $or: searchableFields.map((field) => ({
-                [field]: {$regex: searchTerm, $options:"i"},
-            })as FilterQuery<T>),
-        });
+search(searchableFields: string[]) {
+  const searchTerm = this.query?.searchTerm as string;
+  const dateSearch = this.query?.dateSearch as string;
+  const objectIdSearch = this.query?.objectIdSearch as string;
 
-        }
-        return  this;
+  const orConditions: FilterQuery<T>[] = [];
 
-
+  // Handle string/number search
+  if (searchTerm) {
+    for (const field of searchableFields) {
+      orConditions.push({
+        [field]: { $regex: searchTerm, $options: 'i' },
+      } as FilterQuery<T>);
     }
+  }
+
+  // Handle date search
+  if (dateSearch) {
+    const parsedDate = dayjs(dateSearch);
+    if (parsedDate.isValid()) {
+      orConditions.push({
+        date: parsedDate.toISOString(),
+      } as FilterQuery<T>);
+    }
+  }
+
+  // Handle ObjectId search
+  if (objectIdSearch && isValidObjectId(objectIdSearch)) {
+    console.log(searchableFields)
+    for (const field of searchableFields) {
+      if (field !== 'date') {
+      orConditions.push({
+        [field]: new Types.ObjectId(objectIdSearch),
+      } as FilterQuery<T>);
+    }
+  }
+}
+// console.log(orConditions)
+
+  if (orConditions.length > 0) {
+    this.modelQuery = this.modelQuery.find({  $or: orConditions });
+  }
+
+  return this;
+}
+
 
     filter(){
         const queryObj =  {...this.query};

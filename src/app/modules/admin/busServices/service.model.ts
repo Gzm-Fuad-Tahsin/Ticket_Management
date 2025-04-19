@@ -9,7 +9,7 @@ const BusServiceSchema = new Schema<IBusService>({
   price: {type: Number },
   available_seats : {type: [String], default: [] },
   total_seats: {type: [String], default: [] },
-  ride_completed: {type: Boolean, default: false },
+  availability: {type: Boolean, default: true },
 
 }, { timestamps: true });
 

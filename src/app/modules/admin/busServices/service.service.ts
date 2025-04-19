@@ -57,6 +57,7 @@ const updateService = async(id: string, payload: IBusService)=>{
         available_seats: payload?.available_seats,
         price: payload?.price,
         total_seats: payload?.total_seats,
+        availability: payload?.availability,
     }
     const session = await mongoose.startSession();
     try {

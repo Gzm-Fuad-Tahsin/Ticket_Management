@@ -8,6 +8,6 @@ export interface IBusService{
     price: number,
     total_seats: string[],
     available_seats: string[],
-    ride_completed: boolean,
+    availability: boolean,
 
 } 

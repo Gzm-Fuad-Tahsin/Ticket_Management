@@ -65,6 +65,16 @@ const PinValidationSchema = z.object({
         PIN : z.string({required_error : 'Pin is required'})
     }),
 });
+
+
+const PurchaseTicketValidationSchema = z.object({
+    body: z.object({
+        bus_id: z.string({ required_error: 'bus_id is required' }),
+        service_id: z.string({ required_error: 'service_id is required' }),
+        seat_number: z.string({ required_error: 'seat_number is required' }),
+    }),
+});
+
 export const UserValidation = {
     SignUpByEmailAndPasswordValidationSchema,
     loginValidationSchema,
@@ -75,4 +85,6 @@ export const UserValidation = {
     resetPasswordValidationSchema,
     PinValidationSchema,
     ChangeNameValidationSchema,
+
+    PurchaseTicketValidationSchema
 };

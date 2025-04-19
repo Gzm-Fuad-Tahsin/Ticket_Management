@@ -1,384 +1,173 @@
-import mongoose, { Types } from "mongoose";
+import mongoose, { isValidObjectId, Types } from "mongoose";
+import QueryBuilder from "../../builder/QueryBuilder";
+import { BusService } from "../admin/busServices/service.model";
+import { Ticket } from "../admin/ticket/ticket.model";
+import { Bus } from "../admin/bus/bus.model";
+import { ITicket } from "../admin/ticket/ticket.interface";
 import AppError from "../../errors/AppError";
-import { TLoginUser, TUser } from "./user.interface";
-import { User } from "./user.model";
-import httpStatus from 'http-status';
-import config from "../../config";
-import { JwtPayload } from "jsonwebtoken";
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { sendEmail } from "../../utils/sendEmail";
-import { generateOTP } from "../../utils/generateOTP";
-import { createToken } from "../../utils/authToken";
-// import { OAuth2Client } from "google-auth-library";
+import httpStatus from "http-status";
 
-// const UpdatePassword = async (userID: Types.ObjectId, newPassword: string) => {
-//     const newHashedPassword = await bcrypt.hash(
-//         newPassword,
-//         Number(config.bcrypt_salt_round),
-//     );
-//     await User.findOneAndUpdate(
-//         {
-//             _id: userID,
-//         },
-//         {
-//             password: newHashedPassword,
-//             needsPasswordChange: false,
-//             passwordChangedAt: new Date(),
-//         },
-//     );
-// }
+export const getBus = async (
+  query: Record<string, unknown> // or RequestQuery for stricter type
+) => {
+  // console.log(query);
+  const ids = await BusService.distinct("bus_id", { availability: true });
+//  console.log(ids);
+  
+  const queryBuilder = new QueryBuilder(
+    Bus.find({ _id: { $in: ids } }),
+    query
+  );
 
-const SignUp = async (payload: TUser) => {
-    const isUserExist = await User.isUserExistsByEmail(payload.email);
-    if (isUserExist) {
-        throw new AppError(httpStatus.CONFLICT, 'User Already exists');
-    }
+  queryBuilder.filter();
+  queryBuilder.search(["name", "bus_number"]);
+  queryBuilder.sort();
+  queryBuilder.paginate();
+  queryBuilder.filed();
 
-    const userData: Partial<TUser> = {
-        email: payload.email,
-        userName: payload.userName,
-        password: payload.password,
-    };
+  const bus = await queryBuilder.modelQuery;
+  const meta = await queryBuilder.countTotal();
 
-    const session = await mongoose.startSession();
-    try {
-        session.startTransaction();
-
-        // Create the user
-        const user = await User.create([userData], { session });
-        if (!user.length) {
-            throw new AppError(httpStatus.BAD_REQUEST, 'Failed to create user');
-        }
-
-
-
-        await session.commitTransaction();
-
-        // create token and sent to the client
-
-        const jwtPayload = {
-            email: user[0].email,
-        };
-        const accessToken = createToken(
-            jwtPayload,
-            config.JWT_ACCESS_SECRET as string,
-            config.JWT_ACCESS_EXPIRES_IN as string,
-        );
-
-        const refreshToken = createToken(
-            jwtPayload,
-            config.JWT_REFRESH_SECRET as string,
-            config.JWT_REFRESH_EXPIRES_IN as string,
-        );
-
-
-        return {
-            user: {
-                _id: user[0]._id,
-                email: user[0].email,
-                userName: user[0].userName,
-            },
-            accessToken,
-            refreshToken
-        };
-    } catch (error) {
-
-        await session.abortTransaction();
-
-        throw new AppError(
-            httpStatus.BAD_REQUEST,
-            (error as Error).message || 'An unknown error occurred',
-            (error as Error)?.stack,
-        );
-    } finally {
-
-        await session.endSession();
-    }
-}
-
-const login = async (payload: TLoginUser) => {
-    // check if the userExist
-    const user = await User.isUserExistsByEmail(payload.email);
-
-    if (!user) {
-        throw new AppError(httpStatus.NOT_FOUND, 'User not found');
-    }
-
-    // checking if the user is already deleted
-    const isDeleted = user.isDeleted;
-    if (isDeleted) {
-        throw new AppError(
-            httpStatus.FORBIDDEN,
-            'User is already removed from system',
-        );
-    }
-    //checking if the password is correct
-    if (user?.password && !(await User.isPasswordMatched(payload.password, user.password))) {
-        throw new AppError(httpStatus.FORBIDDEN, 'Password is not correct');
-    }
-
-
-    const jwtPayload = {
-        email: user.email
-    };
-    const accessToken = createToken(
-        jwtPayload,
-        config.JWT_ACCESS_SECRET as string,
-        config.JWT_ACCESS_EXPIRES_IN as string,
-    );
-
-    const refreshToken = createToken(
-        jwtPayload,
-        config.JWT_REFRESH_SECRET as string,
-        config.JWT_REFRESH_EXPIRES_IN as string,
-    );
-
-
-    return {
-        user: {
-            _id: user._id,
-            email: user.email,
-            userName: user.userName
-        },
-        accessToken,
-        refreshToken
-    };
-
-
+  return { bus, meta };
 };
 
-// const changePassword = async (
-//     userData: JwtPayload,
-//     payload: { oldPassword: string; newPassword: string },
-// ) => {
-//     // check if the userExist
-//     const user = await User.isUserExistsByEmail(userData.email);
-//     if (!user) {
-//         throw new AppError(httpStatus.NOT_FOUND, 'User not found');
-//     }
-//     // checking if the user is already deleted
-//     const isDeleted = user?.isDeleted;
-//     if (isDeleted) {
-//         throw new AppError(
-//             httpStatus.FORBIDDEN,
-//             'User is already removed from system',
-//         );
-//     }
+// export const getTicket = async (
+//     query: Record<string, unknown> // or RequestQuery for stricter type
+//     )=> {
+//         const queryBuilder = new QueryBuilder(BusService.find({ride_completed: false}), query);
+//         queryBuilder.filter();
+//         queryBuilder.search(["bus_id", "date","price"]);
+//         queryBuilder.sort();
+//         queryBuilder.paginate();
+//         queryBuilder.filed();
+//         const ticket = await queryBuilder.modelQuery;
+//         const meta = await queryBuilder.countTotal();
+//         return { ticket, meta };
+//         };
 
-//     //checking if the old password is correcttly matched with db password
-//     if (user.password && !(await User.isPasswordMatched(payload.oldPassword, user?.password))) {
-//         throw new AppError(httpStatus.FORBIDDEN, 'old Password is not correct');
-//     }
+const getTicket = async (query: Record<string, unknown>) => {
+  const searchTerm = query.searchTerm as string | undefined;
+  const objectId = query.busId as string | undefined;
+  const dateString = query.date as string | undefined;
 
-//     await UpdatePassword(user._id, payload.newPassword);
-//     return null;
-// };
+  const andConditions: any[] = [{ availability: true }];
 
-// const getAccessToken = async (token: string) => {
+  // // Search by name (searchTerm)
+  // if (searchTerm) {
+  //   andConditions.push({
+  //     name: { $regex: searchTerm, $options: "i" },
+  //   });
+  // }
 
-//     if (!token) {
-//         throw new AppError(httpStatus.UNAUTHORIZED, 'Unauthrized access');
-//     }
+  // Search by ObjectId
+  if (objectId && isValidObjectId(objectId)) {
+    andConditions.push({ bus_id: objectId });
+  }
 
-//     const decoded = jwt.verify(
-//         token,
-//         config.JWT_REFRESH_SECRET as string,
-//     ) as JwtPayload;
+  // Search by date
+  if (dateString) {
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      // match full date range (00:00 to 23:59)
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
 
-//     const { email, iat } = decoded;
+      andConditions.push({
+        date: { $gte: start, $lte: end },
+      });
+    }
+  }
 
-//     const user = await User.isUserExistsByEmail(email);
+  const filterQuery =
+    andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
+  console.log(filterQuery);
 
-//     if (!user) {
-//         throw new AppError(httpStatus.NOT_FOUND, 'User not found');
-//     }
+  const tickets = await BusService.find(filterQuery);
+  // console.log(tickets);
 
-//     // checking if the user is already deleted
-//     const isDeleted = user?.isDeleted;
-//     if (isDeleted) {
-//         throw new AppError(
-//             httpStatus.FORBIDDEN,
-//             'User is already removed from system',
-//         );
-//     }
+  return {
+    ticket: tickets,
+    meta: {
+      total: tickets.length,
+    },
+  };
+};
 
+const PurchaseTicket = async (payload: Partial<ITicket>, user: string) => {
+  let servicesData = await BusService.findOne({_id: payload.service_id,availability: true });
 
-//     //check if the token is generated before the  password has changed
-//     if (
-//         user?.passwordChangedAt &&
-//         User.isJWTIssuedBeforePasswordChanged(user.passwordChangedAt, iat as number)
-//     ) {
-//         throw new AppError(
-//             httpStatus.FORBIDDEN,
-//             'You are not authorized. Log in Again',
-//         );
-//     }
+  if (!servicesData) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Service not found");
+  }
 
+  if (
+    !payload.bus_id ||
+    !payload.service_id ||
+    !payload.seat_number ||
+    !servicesData.price
+  ) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Missing required fields');
+  }
+  // Check if seat_number is available
+if (!servicesData.available_seats.includes(payload.seat_number)) {
+  throw new AppError(httpStatus.BAD_REQUEST, 'Seat is already booked or not available');
+}
 
-//     const jwtPayload = {
-//         email: user.email,
-//         rootFolder: user.rootFolderID
-//     };
-//     const accessToken = createToken(
-//         jwtPayload,
-//         config.JWT_ACCESS_SECRET as string,
-//         config.JWT_ACCESS_EXPIRES_IN as string,
-//     );
+  const ticketData: ITicket = {
+    bus_id: payload.bus_id,
+    service_id: payload.service_id,
+    user_id: new Types.ObjectId(user),
+    book_at: new Date(),
+    seat_number: payload.seat_number,
+    price: servicesData.price,
+  };
 
-//     return {
-//         accessToken,
-//     };
-// };
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
 
-// const forgetPassword = async (email: string) => {
-//     const user = await User.isUserExistsByEmail(email);
+    // Create ticket
+    const ticket = await Ticket.create([ticketData], { session });
+    if (!ticket.length) {
+      throw new AppError(httpStatus.BAD_REQUEST, 'Failed to Purchase Ticket');
+    }
 
-//     if (!user) {
-//         throw new AppError(httpStatus.NOT_FOUND, 'User not found');
-//     }
+    // Update BusService: remove booked seat from available_seats
+    const updateResult = await BusService.findByIdAndUpdate(
+      payload.service_id,
+      {
+        $pull: { available_seats: payload.seat_number },
+      },
+      { session }
+    );
 
-//     // checking if the user is already deleted
-//     const isDeleted = user?.isDeleted;
-//     if (isDeleted) {
-//         throw new AppError(
-//             httpStatus.FORBIDDEN,
-//             'User is already removed from system',
-//         );
-//     }
+    if (!updateResult) {
+      throw new AppError(httpStatus.BAD_REQUEST, 'Failed to update BusService seat availability');
+    }
 
-//     const currentTime = new Date();
-//     const OTPExpiresAt = user.verificationInfo?.OTPExpiresAt;
+    await session.commitTransaction();
 
-//     if (OTPExpiresAt && currentTime < OTPExpiresAt) {
-//         throw new AppError(
-//             httpStatus.FORBIDDEN,
-//             'OTP already generated recently',
-//         );
-//     }
+    return {
+      ticket: ticket[0],
+    };
+  } catch (error) {
+    await session.abortTransaction();
 
-//     const OTP = generateOTP(6);
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      (error as Error).message || 'An unknown error occurred',
+      (error as Error)?.stack,
+    );
+  } finally {
+    await session.endSession();
+  }
+};
 
-//     const newOTPExpiresAt = new Date();
-//     newOTPExpiresAt.setMinutes(newOTPExpiresAt.getMinutes() + 5);
-
-//     const updatedUser = await User.updateOne(
-//         { email: user.email },
-//         {
-//             $set: {
-//                 'verificationInfo.OTP': OTP,
-//                 'verificationInfo.OTPExpiresAt': newOTPExpiresAt,
-//                 'verificationInfo.OTPUsed': false,
-//             },
-//         }
-//     );
-
-//     if (updatedUser.modifiedCount === 0) {
-//         throw new AppError(httpStatus.BAD_REQUEST, 'Failed to update OTP');
-//     }
-
-//     //send otp to the email of the user
-//     const OTPmail = `Your OTP for changing password is ${OTP}. Please verify in 5 minutes`;
-
-//     await sendEmail(user.email, OTPmail);
-
-//     return null;
-// };
-
-// const verifyOTP = async (email: string, OTP: string) => {
-
-//     const user = await User.isUserExistsByEmail(email);
-
-//     if (!user) {
-//         throw new AppError(httpStatus.NOT_FOUND, 'User not found');
-//     }
-
-//     // checking if the user is already deleted
-//     const isDeleted = user?.isDeleted;
-//     if (isDeleted) {
-//         throw new AppError(
-//             httpStatus.FORBIDDEN,
-//             'User is already removed from system',
-//         );
-//     }
-
-//     if (!User.isOTPVerified(
-//         OTP,
-//         user?.verificationInfo?.OTP,
-//         user?.verificationInfo?.OTPExpiresAt,
-//         user?.verificationInfo?.OTPUsed,
-//     )) {
-//         throw new AppError(
-//             httpStatus.FORBIDDEN,
-//             'OTP verification failed',
-//         );
-//     }
-
-//     const jwtPayload = {
-//         email: user.email
-//     };
-//     const token = createVerifyUserToken(
-//         jwtPayload,
-//         config.JWT_VERIFIED_USER_SECRET as string,
-//         '60m',
-//     );
-//     return {
-//         token,
-
-//     }
-// }
-
-// const resetPassword = async (token: string, password: string) => {
-
-//     if (!token) {
-//         throw new AppError(httpStatus.UNAUTHORIZED, 'Unauthrized');
-//     }
-
-//     const decoded = jwt.verify(
-//         token,
-//         config.JWT_VERIFIED_USER_SECRET as string,
-//     ) as JwtPayload;
-
-//     const { email } = decoded;
-
-//     const user = await User.isUserExistsByEmail(email);
-
-//     if (!user) {
-//         throw new AppError(httpStatus.NOT_FOUND, 'User not found');
-//     }
-
-//     // checking if the user is already deleted
-//     const isDeleted = user?.isDeleted;
-//     if (isDeleted) {
-//         throw new AppError(
-//             httpStatus.FORBIDDEN,
-//             'User is already removed from system',
-//         );
-//     }
-//     await UpdatePassword(user._id, password);
-
-//     const updateResult = await User.updateOne(
-//         { _id: user._id },
-//         {
-//             $unset: { verificationInfo: 1 },
-//         }
-//     );
-
-//     if (!updateResult.matchedCount || !updateResult.modifiedCount) {
-//         throw new AppError(httpStatus.BAD_REQUEST, 'Failed to remove verification information');
-//     }
-
-//     return null;
-
-// };
 
 export const UserServices = {
-    SignUp,
-    login,
-    // googleAuth,
-    // changePassword,
-    // getAccessToken,
-    // forgetPassword,
-    // verifyOTP,
-    // resetPassword,
-}
+  getBus,
+  getTicket,
+  PurchaseTicket
+};
