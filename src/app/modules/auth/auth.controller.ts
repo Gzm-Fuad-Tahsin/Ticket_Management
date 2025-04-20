@@ -40,3 +40,18 @@ export const signUpUserByEmailandPassword = catchAsync(async (req, res) => {
         data: { accessToken, user },
     });
 })
+
+export const logout = catchAsync(async (req, res) => {
+    res.clearCookie('refreshToken', {
+      secure: config.NODE_ENV === 'production',
+      httpOnly: true,
+      sameSite: 'none',
+    });
+  
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'User logged out successfully',
+      data: "",
+    });
+  });
